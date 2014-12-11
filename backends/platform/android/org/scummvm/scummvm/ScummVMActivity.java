@@ -5,21 +5,30 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.media.AudioManager;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import java.io.File;
+import java.net.URL;
 
 public class ScummVMActivity extends Activity {
 
+	private View mGame;
+	private MouseEmulatorTask task1;
+	private MouseEmulatorTask task2;
+	
 	/* Establish whether the hover events are available */
 	private static boolean _hoverAvailable;
 
@@ -182,7 +191,14 @@ public class ScummVMActivity extends Activity {
 
 		main_surface.setOnKeyListener(_events);
 		main_surface.setOnTouchListener(_events);
+		main_surface.setOnGenericMotionListener(_events);
 
+		mGame = (View) findViewById(R.id.main_surface);
+		task1 = new MouseEmulatorTask();
+        task1.execute(new Integer[]{5,1});
+        task2 = new MouseEmulatorTask();
+        task2.execute(new Integer[]{5,2});
+		
 		_scummvm_thread = new Thread(_scummvm, "ScummVM");
 		_scummvm_thread.start();
 	}
@@ -226,7 +242,8 @@ public class ScummVMActivity extends Activity {
 	@Override
 	public void onDestroy() {
 		Log.d(ScummVM.LOG_TAG, "onDestroy");
-
+		task1.cancel(true);
+		task2.cancel(true);
 		super.onDestroy();
 
 		if (_events != null) {
@@ -251,6 +268,7 @@ public class ScummVMActivity extends Activity {
 		return false;
 	}
 
+	/*
 	@Override
 	public boolean onGenericMotionEvent(final MotionEvent e) {
 		if (_events != null)
@@ -258,6 +276,7 @@ public class ScummVMActivity extends Activity {
 
 		return false;
 	}
+	*/
 
 	private void showKeyboard(boolean show) {
 		SurfaceView main_surface = (SurfaceView)findViewById(R.id.main_surface);
@@ -280,5 +299,94 @@ public class ScummVMActivity extends Activity {
 				   "tv.ouya.controller.action.SHOW_CURSOR" :
 				   "tv.ouya.controller.action.HIDE_CURSOR");
 		sendBroadcast(intent);
+	}
+	
+	public class MouseEmulatorTask extends AsyncTask<Integer, Integer, Long> {
+		protected void onPreExecute() {
+	         //showDialog("Downloaded " + result + " bytes");
+	    	 Log.i(ScummVM.LOG_TAG,"MouseEmulatorTask started");
+	     }
+	
+	     protected Long doInBackground(Integer... data) {
+	         int delay = data[0];
+	         int axis = data[1];
+	         long totalSize = 0;
+	         
+	         while (true) {
+		         try {
+					Thread.sleep(delay);
+					//getRunningApps();
+				 } catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				 }
+		         if (isCancelled()) break;
+
+		         boolean done[] = new boolean[4];
+		         /*
+		         if (_events.getActiveCursor(axis,(axis==1 ? 0 : 2))) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.ACTION_DOWN);
+		        	 done[0] = true;
+		         }
+		         if (_events.getActiveCursor(axis,(axis==1 ? 1 : 3))) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.ACTION_DOWN);
+		        	 done[1] = true;
+		         }
+		         if (_events.getActiveCursor(axis,(axis==1 ? 2 : 0))) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.ACTION_DOWN);
+		        	 done[2] = true;
+		         }
+		         if (_events.getActiveCursor(axis,(axis==1 ? 3 : 1))) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_UP,KeyEvent.ACTION_DOWN);
+		        	 done[3] = true;
+		         }
+		         */
+		         
+		         if (axis == 1 && _events.getActiveCursor(1,0)) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.ACTION_DOWN);
+		        	 done[0] = true;
+		         }
+		         if (axis == 1 && _events.getActiveCursor(1,1)) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.ACTION_DOWN);
+		        	 done[1] = true;
+		         }
+		         if (axis == 2 && _events.getActiveCursor(1,2)) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.ACTION_DOWN);
+		        	 done[2] = true;
+		         }
+		         if (axis == 2 && _events.getActiveCursor(1,3)) {
+		        	 generateKeyEvent(KeyEvent.KEYCODE_DPAD_UP,KeyEvent.ACTION_DOWN);
+		        	 done[3] = true;
+		         }
+	         	 if (done[0]) generateKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT,KeyEvent.ACTION_UP);
+	         	 if (done[1]) generateKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.ACTION_UP);
+	         	 if (done[2]) generateKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.ACTION_UP);
+	         	 if (done[3]) generateKeyEvent(KeyEvent.KEYCODE_DPAD_UP,KeyEvent.ACTION_UP);	         	 	         
+	         }
+	        
+	         return totalSize;
+	     }
+	    
+
+	     protected void onPostExecute(Long result) {
+	         //showDialog("Downloaded " + result + " bytes");
+	    	 Log.i(ScummVM.LOG_TAG,"MouseEmulatorTask finished");
+	     }
+	}
+	
+
+	public void generateKeyEvent(int keyCode,int action) {
+		Log.d(ScummVM.LOG_TAG,"keyCode = "+keyCode+", action = "+action);
+		/*
+		if (KeyEvent.KEYCODE_DPAD_RIGHT == keyCode) System.out.println("Right");
+		else if (KeyEvent.KEYCODE_DPAD_LEFT == keyCode) System.out.println("Left");
+		else if (KeyEvent.KEYCODE_DPAD_DOWN == keyCode) System.out.println("Down");
+		else if (KeyEvent.KEYCODE_DPAD_UP == keyCode) System.out.println("Up");
+		*/
+		if (mGame != null) {
+			BaseInputConnection  mInputConnection = new BaseInputConnection(mGame, true);
+			mInputConnection.sendKeyEvent(new KeyEvent(action,keyCode));
+			//mInputConnection.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
+		}
 	}
 }

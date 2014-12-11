@@ -1,20 +1,29 @@
 package org.scummvm.scummvm;
 
+import java.util.List;
+
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
+import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.content.Context;
+import android.view.InputDevice;
+import android.view.InputEvent;
 import android.view.KeyEvent;
 import android.view.KeyCharacterMap;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.GestureDetector;
+import android.view.InputDevice.MotionRange;
 import android.view.InputDevice;
 import android.view.inputmethod.InputMethodManager;
 
 public class ScummVMEvents implements
 		android.view.View.OnKeyListener,
 		android.view.View.OnTouchListener,
+		android.view.View.OnGenericMotionListener,
 		android.view.GestureDetector.OnGestureListener,
 		android.view.GestureDetector.OnDoubleTapListener {
 
@@ -52,6 +61,8 @@ public class ScummVMEvents implements
 		_gd = new GestureDetector(context, this);
 		_gd.setOnDoubleTapListener(this);
 		_gd.setIsLongpressEnabled(false);
+		
+		mInputDeviceStates = new SparseArray<InputDeviceState>();
 
 		_longPress = ViewConfiguration.getLongPressTimeout();
 	}
@@ -67,10 +78,33 @@ public class ScummVMEvents implements
 							0, 0);
 		return true;
 	}
+	
+	protected boolean[] activeCursor1 = new boolean[4];
+	protected boolean[] activeCursor2 = new boolean[4];
+	
+	private SparseArray<InputDeviceState> mInputDeviceStates;
+	
+	private InputDeviceState getInputDeviceState(InputEvent event) {
+        final int deviceId = event.getDeviceId();
+        InputDeviceState state = mInputDeviceStates.get(deviceId);
+        if (state == null) {
+            final InputDevice device = event.getDevice();
+            if (device == null) {
+                return null;
+            }
+            state = new InputDeviceState(device);
+            mInputDeviceStates.put(deviceId, state);
 
+            Log.i(ScummVM.LOG_TAG, device.toString());
+        }
+        return state;
+    }
+
+	/*
 	public boolean onGenericMotionEvent(MotionEvent e) {
 		return false;
 	}
+	*/
 
 	final static int MSG_MENU_LONG_PRESS = 1;
 
@@ -90,6 +124,7 @@ public class ScummVMEvents implements
 	// OnKeyListener
 	@Override
 	final public boolean onKey(View v, int keyCode, KeyEvent e) {
+		Log.d(ScummVM.LOG_TAG,"onKey keyCode="+keyCode);
 		final int action = e.getAction();
 
 		if (keyCode == 238) {
@@ -97,6 +132,17 @@ public class ScummVMEvents implements
 			return false;
 		}
 
+		if (keyCode == KeyEvent. KEYCODE_BUTTON_1) {
+			((ScummVMActivity)_context).generateKeyEvent(KeyEvent.KEYCODE_SPACE,action);
+			return true;
+		}
+		if (keyCode == KeyEvent. KEYCODE_BUTTON_2) {
+			_scummvm.pushEvent(JE_DPAD, action, KeyEvent.KEYCODE_DPAD_CENTER,
+					(int)(e.getEventTime() - e.getDownTime()),
+					e.getRepeatCount(), 0);
+			return true;
+		}
+		
 		if (keyCode == KeyEvent.KEYCODE_BACK) {
 			if (action != KeyEvent.ACTION_UP) {
 				// only send event from back button on up event, since down event is sent on right mouse click and
@@ -239,6 +285,81 @@ public class ScummVMEvents implements
 
 		return _gd.onTouchEvent(e);
 	}
+	
+	// OnGenericMotionListener
+	final public boolean onGenericMotion(View v, MotionEvent event) {
+		Log.i(ScummVM.LOG_TAG,"onGenericMotion");
+		if ((event.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0
+                && event.getAction() == MotionEvent.ACTION_MOVE) {
+            // Update device state for visualization and logging.
+            InputDeviceState state = getInputDeviceState(event);
+            if (state != null && state.onJoystickMotion(event)) {
+            	            	
+                //mSummaryAdapter.show(state);
+                
+                if (state.getAxisValue(0)>0.9) {
+            		if (activeCursor1[0] == false) activeCursor1[0] = true;
+            	}
+                else if (state.getAxisValue(0)<0.9) {
+                	if (activeCursor1[0] == true) activeCursor1[0] = false;
+                }
+                
+            	if (state.getAxisValue(0)<-0.9) {
+            		if (activeCursor1[1] == false) activeCursor1[1] = true;
+            	}
+            	else if (state.getAxisValue(0)>-0.9) {
+            		if (activeCursor1[1] == true) activeCursor1[1] = false;
+            	}
+            	
+            	if (state.getAxisValue(1)>0.9) {            		
+            		if (activeCursor1[2] == false) activeCursor1[2] = true;
+            	}
+            	else if (state.getAxisValue(1)<0.9) {
+            		if (activeCursor1[2] == true) activeCursor1[2] = false;
+            	}
+            	
+            	
+            	if (state.getAxisValue(1)<-0.9) {
+            		if (activeCursor1[3] == false) activeCursor1[3] = true;
+            	}
+            	else if (state.getAxisValue(1)>-0.9) {
+            		if (activeCursor1[3] == true) activeCursor1[3] = false;
+            	}
+            	
+            	//
+            	if (state.getAxisValue(3)>0.9) {
+            		if (activeCursor2[0] == false) activeCursor2[0] = true;
+            	}
+                else if (state.getAxisValue(3)<0.9) {
+                	if (activeCursor2[0] == true) activeCursor2[0] = false;
+                }
+                
+            	if (state.getAxisValue(3)<-0.9) {
+            		if (activeCursor2[1] == false) activeCursor2[1] = true;
+            	}
+            	else if (state.getAxisValue(3)>-0.9) {
+            		if (activeCursor2[1] == true) activeCursor2[1] = false;
+            	}
+            	
+            	if (state.getAxisValue(4)>0.9) {            		
+            		if (activeCursor2[2] == false) activeCursor2[2] = true;
+            	}
+            	else if (state.getAxisValue(4)<0.9) {
+            		if (activeCursor2[2] == true) activeCursor2[2] = false;
+            	}
+            	
+            	
+            	if (state.getAxisValue(4)<-0.9) {
+            		if (activeCursor2[3] == false) activeCursor2[3] = true;
+            	}
+            	else if (state.getAxisValue(4)>-0.9) {
+            		if (activeCursor2[3] == true) activeCursor2[3] = false;
+            	}          
+            	
+            }
+        }
+		return true;
+	}
 
 	// OnGestureListener
 	@Override
@@ -300,5 +421,146 @@ public class ScummVMEvents implements
 	@Override
 	final public boolean onSingleTapConfirmed(MotionEvent e) {
 		return true;
+	}
+	
+	/**
+     * Tracks the state of joystick axes and game controller buttons for a particular
+     * input device for diagnostic purposes.
+     */
+    private static class InputDeviceState {
+        private final InputDevice mDevice;
+        private final int[] mAxes;
+        private final float[] mAxisValues;
+        private final SparseIntArray mKeys;
+
+        public InputDeviceState(InputDevice device) {
+            mDevice = device;
+
+            int numAxes = 0;
+            final List<MotionRange> ranges = device.getMotionRanges();
+            for (MotionRange range : ranges) {
+                if ((range.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
+                    numAxes += 1;
+                }
+            }
+
+            mAxes = new int[numAxes];
+            mAxisValues = new float[numAxes];
+            int i = 0;
+            for (MotionRange range : ranges) {
+                if ((range.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
+                    mAxes[i++] = range.getAxis();
+                }
+            }
+
+            mKeys = new SparseIntArray();
+        }
+
+        public InputDevice getDevice() {
+            return mDevice;
+        }
+
+        public int getAxisCount() {
+            return mAxes.length;
+        }
+
+        public int getAxis(int axisIndex) {
+            return mAxes[axisIndex];
+        }
+
+        public float getAxisValue(int axisIndex) {
+            return mAxisValues[axisIndex];
+        }
+
+        public int getKeyCount() {
+            return mKeys.size();
+        }
+
+        public int getKeyCode(int keyIndex) {
+            return mKeys.keyAt(keyIndex);
+        }
+
+        public boolean isKeyPressed(int keyIndex) {
+            return mKeys.valueAt(keyIndex) != 0;
+        }
+
+        public boolean onKeyDown(KeyEvent event) {
+            final int keyCode = event.getKeyCode();
+            if (isGameKey(keyCode)) {
+                if (event.getRepeatCount() == 0) {
+                    final String symbolicName = KeyEvent.keyCodeToString(keyCode);
+                    mKeys.put(keyCode, 1);
+                    Log.i(ScummVM.LOG_TAG, mDevice.getName() + " - Key Down: " + symbolicName);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public boolean onKeyUp(KeyEvent event) {
+            final int keyCode = event.getKeyCode();
+            if (isGameKey(keyCode)) {
+                int index = mKeys.indexOfKey(keyCode);
+                if (index >= 0) {
+                    final String symbolicName = KeyEvent.keyCodeToString(keyCode);
+                    mKeys.put(keyCode, 0);
+                    Log.i(ScummVM.LOG_TAG, mDevice.getName() + " - Key Up: " + symbolicName);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public boolean onJoystickMotion(MotionEvent event) {
+            StringBuilder message = new StringBuilder();
+            message.append(mDevice.getName()).append(" - Joystick Motion:\n");
+
+            final int historySize = event.getHistorySize();
+            for (int i = 0; i < mAxes.length; i++) {
+                final int axis = mAxes[i];
+                final float value = event.getAxisValue(axis);
+                mAxisValues[i] = value;
+                message.append("  ").append(MotionEvent.axisToString(axis)).append(": ");
+
+                // Append all historical values in the batch.
+                for (int historyPos = 0; historyPos < historySize; historyPos++) {
+                    message.append(event.getHistoricalAxisValue(axis, historyPos));
+                    message.append(", ");
+                }
+
+                // Append the current value.
+                message.append(value);
+                message.append("\n");
+            }
+            //Log.i(TAG, message.toString());
+            
+            
+        	
+            
+            return true;
+        }
+
+        // Check whether this is a key we care about.
+        // In a real game, we would probably let the user configure which keys to use
+        // instead of hardcoding the keys like this.
+        private static boolean isGameKey(int keyCode) {
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_UP:
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_SPACE:
+                    return true;
+                default:
+                    return KeyEvent.isGamepadButton(keyCode);
+            }
+        }
+    }
+
+	public boolean getActiveCursor(int axis, int i) {
+		if (axis == 1) return activeCursor1[i];
+		if (axis == 2) return activeCursor2[i];
+		return false;
 	}
 }
